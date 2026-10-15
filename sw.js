@@ -1,9 +1,9 @@
 /* סופר – service worker: שומר את קבצי האפליקציה כדי שתיפתח מהר וגם בלי קליטה */
-const CACHE = 'super-v2';
+const CACHE = 'super-v3';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'catalog.js', 'manifest.webmanifest',
-  'icons/app-192.png', 'icons/app-512.png', 'icons/apple-touch-icon.png', 'icons/logo.svg',
-  'img/amit.png', 'img/noga.png'
+  'app-192.png', 'app-512.png', 'apple-touch-icon.png', 'logo.svg',
+  'amit.png', 'noga.png'
 ];
 
 self.addEventListener('install', (e) => {

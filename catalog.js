@@ -59,6 +59,6 @@ window.CATALOG = {
 window.CAT_ICON = { veg: 'tomato', dairy: 'milk', bread: 'bread', meat: 'chicken', dry: 'pasta', frozen: 'frozen', snacks: 'chocolate', clean: 'soap', care: 'toothpaste' };
 
 window.PEOPLE = {
-  amit: { name: 'עמית', img: 'img/amit.png', ring: '#6B7A3A', me: 'זה אני, עמית', added: 'עמית הוסיף', bought: 'עמית קנה' },
-  noga: { name: 'נגה', img: 'img/noga.png', ring: '#C4623E', me: 'זאת אני, נגה', added: 'נגה הוסיפה', bought: 'נגה קנתה' }
+  amit: { name: 'עמית', img: 'amit.png', ring: '#6B7A3A', me: 'זה אני, עמית', added: 'עמית הוסיף', bought: 'עמית קנה' },
+  noga: { name: 'נגה', img: 'noga.png', ring: '#C4623E', me: 'זאת אני, נגה', added: 'נגה הוסיפה', bought: 'נגה קנתה' }
 };

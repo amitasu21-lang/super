@@ -30,7 +30,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ');
   const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  const icon = (name) => 'img/p/' + (name || 'bag') + '.svg';
+  const icon = (name) => '' + (name || 'bag') + '.svg';
   const person = (id) => PEOPLE[id] || null;
 
   const ICONS = {
@@ -160,7 +160,7 @@
   function renderJoin() {
     $app.innerHTML = `
       <main class="screen">
-        <img src="icons/logo.svg" alt="" width="96" height="96">
+        <img src="logo.svg" alt="" width="96" height="96">
         <h1 class="hand">ברוכים הבאים לסופר</h1>
         <p style="margin:0;font-size:17px;line-height:1.5">כדי להתחבר לרשימה של הבית, הדביקו כאן את קישור ההצטרפות שקיבלתם</p>
         <form id="joinForm" style="width:100%;display:flex;flex-direction:column;gap:10px">
@@ -193,7 +193,7 @@
     let pick = null;
     $app.innerHTML = `
       <main class="screen">
-        <img src="icons/logo.svg" alt="" width="96" height="96">
+        <img src="logo.svg" alt="" width="96" height="96">
         <h1 class="hand">ברוכים הבאים לסופר</h1>
         <p style="margin:0;font-size:18px;font-weight:500">מי משתמש בטלפון הזה?</p>
         <div class="people">
@@ -237,7 +237,7 @@
       <header class="top">
         <div class="top-row">
           <div class="brand">
-            <img src="icons/logo.svg" alt="">
+            <img src="logo.svg" alt="">
             <div><h1 class="hand">סופר</h1><small>שלום ${esc(me.name)}!</small></div>
           </div>
           <button type="button" class="duo" id="duoBtn" aria-label="הגדרות והזמנה">
@@ -286,7 +286,7 @@
     document.getElementById('doneBtn').disabled = inCart === 0;
 
     if (!items.length) {
-      box.innerHTML = `<div class="empty"><img src="icons/logo.svg" alt=""><h2 class="hand">הרשימה ריקה</h2><p style="margin:0">חסר משהו בבית? כתבו אותו למעלה</p></div>`;
+      box.innerHTML = `<div class="empty"><img src="logo.svg" alt=""><h2 class="hand">הרשימה ריקה</h2><p style="margin:0">חסר משהו בבית? כתבו אותו למעלה</p></div>`;
       return;
     }
     box.innerHTML = cats.map((c) => {
@@ -602,7 +602,7 @@
     const box = document.getElementById('hist'); if (!box) return;
     const trips = S.data.history || [];
     if (!trips.length) {
-      box.innerHTML = `<div class="empty"><img src="icons/logo.svg" alt=""><h2 class="hand">עוד אין היסטוריה</h2><p style="margin:0">אחרי "סיימנו קניות!" הקנייה תופיע כאן</p></div>`;
+      box.innerHTML = `<div class="empty"><img src="logo.svg" alt=""><h2 class="hand">עוד אין היסטוריה</h2><p style="margin:0">אחרי "סיימנו קניות!" הקנייה תופיע כאן</p></div>`;
       return;
     }
     const onList = {}; (S.data.items || []).forEach((i) => { if (!i.checked) onList[norm(i.name)] = true; });
