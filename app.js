@@ -19,6 +19,8 @@
     pending: 0,
     lastLocal: 0,
     openTrip: null,
+    seen: {},
+    seenReady: false,
     installEvt: null
   };
 
@@ -96,8 +98,12 @@
     if (d) d.classList.toggle('off', !v);
     if (t) t.textContent = v ? 'שניכם מחוברים' : 'אין חיבור';
   }
+  let lastJSON = '';
   function accept(state) {
     if (!state) return;
+    const j = JSON.stringify(state);
+    if (j === lastJSON && j === JSON.stringify(S.data)) return; // nothing changed – don't redraw
+    lastJSON = j;
     S.data = state;
     LS.set('cache', state);
     renderData();
@@ -305,13 +311,15 @@
         ${list.map(itemHTML).join('')}
       </section>`;
     }).join('');
+    S.seenReady = true;
     box.querySelectorAll('.chk').forEach((b) => { b.onclick = () => onToggle(b.dataset.id); });
     box.querySelectorAll('.body').forEach((b) => { b.onclick = () => openEdit(b.dataset.id); });
   }
 
   function itemHTML(it) {
     const p = person(it.by);
-    return `<div class="item${it.checked ? ' done' : ''}">
+    const fresh = !S.seen[it.id]; S.seen[it.id] = true;
+    return `<div class="item${it.checked ? ' done' : ''}${fresh && S.seenReady ? ' fresh' : ''}">
       <button type="button" class="chk" data-id="${esc(it.id)}" aria-pressed="${it.checked}" aria-label="${it.checked ? 'ביטול סימון' : 'סימון כנקנה'}: ${esc(it.name)}">${it.checked ? ICONS.tick : ''}</button>
       <div class="pic"><img src="${itemIcon(it)}" alt=""></div>
       <button type="button" class="body" data-id="${esc(it.id)}" aria-label="עריכה: ${esc(it.name)}">
@@ -567,7 +575,10 @@
           status: ${S.online ? 'online' : 'offline'}<br>
           error: ${esc(S.lastError || '-')}
         </div>
-        <button type="button" class="btn-small" id="sTest" style="margin-top:8px">בדיקת חיבור עכשיו</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn-small" id="sTest">בדיקת חיבור עכשיו</button>
+          <button type="button" class="btn-small" id="sRelink" style="background:var(--card)">החלפת קישור הצטרפות</button>
+        </div>
       </details>
       <button type="button" class="link" id="sSwitch">זה לא ${esc(me.name)}? החלפת משתמש</button>`, (root) => {
       root.querySelector('#sInvite').onclick = () => {
@@ -579,6 +590,7 @@
         try { await navigator.clipboard.writeText(inviteLink()); toast('הקישור הועתק'); } catch (e) { toast('לא הצלחתי להעתיק'); }
       };
       root.querySelector('#sTest').onclick = async () => { S.lastError = ''; await refresh(); closeSheet(); openSettings(); toast(S.online ? 'החיבור תקין' : 'עדיין אין חיבור'); };
+      root.querySelector('#sRelink').onclick = () => { closeSheet(); S.cfg = null; LS.del('cfg'); LS.del('cache'); S.data = { items: [], cats: [], learned: {}, history: [] }; renderJoin(); };
       root.querySelector('#sSwitch').onclick = () => { closeSheet(); S.me = null; LS.del('me'); renderWho(); };
     });
   }

@@ -1,5 +1,5 @@
 /* סופר – service worker: שומר את קבצי האפליקציה כדי שתיפתח מהר וגם בלי קליטה */
-const CACHE = 'super-v4';
+const CACHE = 'super-v6';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'catalog.js', 'manifest.webmanifest',
   'app-192.png', 'app-512.png', 'apple-touch-icon.png', 'logo.svg',

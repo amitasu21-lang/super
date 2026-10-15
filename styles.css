@@ -55,8 +55,8 @@ button{cursor:pointer}
 .cat-count{font-size:12px;color:var(--muted)}
 
 .item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:var(--card);
-  border:1.5px solid var(--line);box-shadow:0 2px 0 var(--line-soft);transition:opacity .25s,background .25s;
-  animation:drop .35s ease-out}
+  border:1.5px solid var(--line);box-shadow:0 2px 0 var(--line-soft);transition:opacity .25s,background .25s}
+.item.fresh{animation:drop .35s ease-out}
 @keyframes drop{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
 .item.done{background:rgba(255,251,242,.45);border-color:var(--line-soft);box-shadow:none;opacity:.62}
 .chk{width:36px;height:36px;flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;
