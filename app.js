@@ -35,6 +35,89 @@
   const icon = (name) => '' + (name || 'bag') + '.svg';
   const person = (id) => PEOPLE[id] || null;
 
+  /* ---------- photos ---------- */
+  const PHOTO_CACHE = LS.get('photos') || {};
+  const photoLoading = {};
+  function photoOf(it) { return it.photo ? PHOTO_CACHE[it.photo] || null : null; }
+  function savePhotoCache() {
+    const keys = Object.keys(PHOTO_CACHE);
+    while (keys.length > 25) delete PHOTO_CACHE[keys.shift()];
+    try { localStorage.setItem('super.photos', JSON.stringify(PHOTO_CACHE)); }
+    catch (e) { const k = Object.keys(PHOTO_CACHE); if (k.length) { delete PHOTO_CACHE[k[0]]; savePhotoCache(); } }
+  }
+  async function loadPhoto(it) {
+    const pid = it.photo;
+    if (!pid || PHOTO_CACHE[pid] || photoLoading[pid]) return;
+    photoLoading[pid] = true;
+    try {
+      const url = S.cfg.api + (S.cfg.api.indexOf('?') === -1 ? '?' : '&') + 'action=photo&id=' + encodeURIComponent(it.id) + '&k=' + encodeURIComponent(S.cfg.k);
+      const res = await parseRes(await fetch(url, { cache: 'no-store' }));
+      if (res.ok && res.data) {
+        PHOTO_CACHE[pid] = res.data; savePhotoCache();
+        document.querySelectorAll('img[data-pid="' + pid + '"]').forEach((im) => { im.src = res.data; im.classList.add('photo'); });
+      }
+    } catch (e) {}
+    delete photoLoading[pid];
+  }
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let max = 720, q = 0.72, out = '';
+        for (let i = 0; i < 10; i++) {
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          out = c.toDataURL('image/jpeg', q);
+          if (out.length < 45000) return resolve(out);
+          if (q > 0.45) q -= 0.08; else max = Math.round(max * 0.82);
+        }
+        out.length < 49000 ? resolve(out) : reject(new Error('big'));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('read')); };
+      img.src = url;
+    });
+  }
+  function viewPhoto(src, it) {
+    const v = document.createElement('div');
+    v.className = 'viewer'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-label', 'תמונת המוצר');
+    v.innerHTML = `
+      <div class="viewer-top">
+        <div class="viewer-title">${it ? `<b>${esc(it.name)}</b>${it.note ? `<span>${esc(it.note)}</span>` : ''}` : ''}</div>
+        <button type="button" class="viewer-x" aria-label="סגירה">✕</button>
+      </div>
+      <div class="viewer-scroll"><img src="${src}" alt="${it ? esc(it.name) : ''}"></div>
+      <div class="viewer-hint">הקישו על התמונה כדי להגדיל · אפשר גם לצבוט עם שתי אצבעות</div>`;
+    const sc = v.querySelector('.viewer-scroll'); const img = sc.querySelector('img'); const hint = v.querySelector('.viewer-hint');
+    let zoom = 1;
+    const setZoom = (z, cx, cy) => {
+      const r = img.getBoundingClientRect(); const sr = sc.getBoundingClientRect();
+      const fx = cx != null ? (cx - r.left) / r.width : .5, fy = cy != null ? (cy - r.top) / r.height : .5;
+      zoom = Math.max(1, Math.min(4, z));
+      sc.classList.toggle('zoomed', zoom > 1);
+      img.style.width = zoom > 1 ? (zoom * 100) + '%' : '';
+      img.style.maxHeight = zoom > 1 ? 'none' : '';
+      requestAnimationFrame(() => {
+        sc.scrollLeft = fx * img.offsetWidth - sr.width / 2 + (sc.scrollWidth > img.offsetWidth ? 0 : 0);
+        sc.scrollTop = fy * img.offsetHeight - sr.height / 2;
+      });
+      hint.textContent = zoom > 1 ? 'גוררים כדי לזוז · הקשה נוספת מקטינה' : 'הקישו על התמונה כדי להגדיל · אפשר גם לצבוט עם שתי אצבעות';
+    };
+    img.onclick = (e) => { e.stopPropagation(); setZoom(zoom > 1 ? 1 : 2.5, e.clientX, e.clientY); };
+    // pinch
+    let pinch = null;
+    sc.addEventListener('touchstart', (e) => { if (e.touches.length === 2) { const [a, b] = e.touches; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z: zoom, cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2 }; } }, { passive: true });
+    sc.addEventListener('touchmove', (e) => { if (pinch && e.touches.length === 2) { e.preventDefault(); const [a, b] = e.touches; setZoom(pinch.z * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / pinch.d, pinch.cx, pinch.cy); } }, { passive: false });
+    sc.addEventListener('touchend', () => { pinch = null; });
+    const close = () => v.remove();
+    v.querySelector('.viewer-x').onclick = close;
+    sc.onclick = (e) => { if (e.target === sc && zoom === 1) close(); };
+    document.body.appendChild(v);
+  }
+
   const ICONS = {
     plus: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 L12 19 M5 12 L19 12" stroke="#FFFBF2" stroke-width="3" stroke-linecap="round"/></svg>',
     tick: '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M4 14 C7 16 9 19 11 22 C14 14 18 8 24 3" fill="none" stroke="#C4623E" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -45,6 +128,7 @@
     again: '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 A8 8 0 1 0 7 6 M4 3 L4 8 L9 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     trash: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7 L20 7 M9 7 L9 4 L15 4 L15 7 M6 7 L7 20 L17 20 L18 7 M10 11 L10 16 M14 11 L14 16" fill="none" stroke="#B23A2A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     bulb: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><path d="M12 3 C7 3 4 7 4 11 C4 14 6 16 8 17 L8 20 L16 20 L16 17 C18 16 20 14 20 11 C20 7 17 3 12 3Z" fill="none" stroke="#4F5E25" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+    camera: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-3px"><path d="M4 8 L8 8 L9.5 5.5 L14.5 5.5 L16 8 L20 8 L20 19 L4 19 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     share: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 L12 15 M7 8 L12 3 L17 8 M5 12 L5 20 L19 20 L19 12" fill="none" stroke="#3B2A1E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
 
@@ -69,9 +153,7 @@
   }
   function itemIcon(it) {
     const hit = dict(norm(it.name));
-    if (hit) return icon(hit[1]);
-    const c = catByKey(it.cat);
-    return icon((c && c.icon) || window.CAT_ICON[it.cat] || 'bag');
+    return icon(hit ? hit[1] : 'smiley');
   }
   function catByKey(k) { return (S.data.cats || []).filter((c) => c.key === k)[0] || null; }
 
@@ -314,6 +396,23 @@
     S.seenReady = true;
     box.querySelectorAll('.chk').forEach((b) => { b.onclick = () => onToggle(b.dataset.id); });
     box.querySelectorAll('.body').forEach((b) => { b.onclick = () => openEdit(b.dataset.id); });
+    box.querySelectorAll('.pic-btn').forEach((b) => {
+      b.onclick = () => {
+        const it = (S.data.items || []).filter((i) => i.id === b.dataset.view)[0];
+        const ph = it && photoOf(it);
+        if (ph) viewPhoto(ph, it); else if (it) openEdit(it.id);
+      };
+    });
+  }
+
+  function picHTML(it, size) {
+    const ph = photoOf(it);
+    if (it.photo && !ph) setTimeout(() => loadPhoto(it), 0);
+    const st = size ? ` style="width:${size}px;height:${size}px;border-width:2px"` : '';
+    if (it.photo) {
+      return `<button type="button" class="pic pic-btn" data-view="${esc(it.id)}" aria-label="הצגת תמונה: ${esc(it.name)}"${st}><img data-pid="${esc(it.photo)}" src="${ph || itemIcon(it)}" class="${ph ? 'photo' : ''}" alt=""></button>`;
+    }
+    return `<div class="pic"${st}><img src="${itemIcon(it)}" alt=""${size ? ` style="width:${Math.round(size * .78)}px;height:${Math.round(size * .78)}px"` : ''}></div>`;
   }
 
   function itemHTML(it) {
@@ -321,7 +420,7 @@
     const fresh = !S.seen[it.id]; S.seen[it.id] = true;
     return `<div class="item${it.checked ? ' done' : ''}${fresh && S.seenReady ? ' fresh' : ''}">
       <button type="button" class="chk" data-id="${esc(it.id)}" aria-pressed="${it.checked}" aria-label="${it.checked ? 'ביטול סימון' : 'סימון כנקנה'}: ${esc(it.name)}">${it.checked ? ICONS.tick : ''}</button>
-      <div class="pic"><img src="${itemIcon(it)}" alt=""></div>
+      ${picHTML(it)}
       <button type="button" class="body" data-id="${esc(it.id)}" aria-label="עריכה: ${esc(it.name)}">
         <span class="name">${esc(it.name)}</span>
         ${it.note ? `<span class="note">${ICONS.pen}${esc(it.note)}</span>` : ''}
@@ -462,7 +561,7 @@
     const g = guess(name);
     sheet(`
       <div class="row" style="gap:12px">
-        <div class="pic" style="width:56px;height:56px"><img src="${icon(g.icon || 'bag')}" alt="" style="width:42px;height:42px"></div>
+        <div class="pic" style="width:56px;height:56px"><img src="${icon(g.icon || 'smiley')}" alt="" style="width:42px;height:42px"></div>
         <div><h2 class="hand">לאן שייך "${esc(name)}"?</h2><span style="font-size:13px;color:var(--muted)">אני עוד לא מכיר את המוצר הזה</span></div>
       </div>
       <div class="chips">${catChips(null)}</div>
@@ -501,6 +600,8 @@
       <div style="display:flex;flex-direction:column;gap:6px">
         <label for="eNote" class="label hand">הערה</label>
         <textarea id="eNote" class="field" rows="2" maxlength="200" placeholder="למשל: 2 ק״ג, רק של תנובה">${esc(it.note)}</textarea>
+        <div class="photo-box" id="ePhotoBox"></div>
+        <input type="file" id="ePhotoFile" accept="image/*" hidden>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <span class="label hand">קטגוריה</span>
@@ -519,6 +620,35 @@
         };
       });
       wireChips();
+      let photo = { pid: it.photo || '', data: photoOf(it), changed: false };
+      const box = root.querySelector('#ePhotoBox');
+      const file = root.querySelector('#ePhotoFile');
+      const drawPhoto = () => {
+        if (photo.data) {
+          box.innerHTML = `<button type="button" class="photo-thumb" id="ePhView" aria-label="הצגת התמונה"><img src="${photo.data}" alt="תמונת המוצר"></button>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button type="button" class="chip" id="ePhChange">${ICONS.camera} החלפת תמונה</button>
+              <button type="button" class="chip" id="ePhDel" style="color:#B23A2A">הסרת התמונה</button>
+            </div>`;
+          box.querySelector('#ePhView').onclick = () => viewPhoto(photo.data, { name: root.querySelector('#eName').value, note: root.querySelector('#eNote').value });
+          box.querySelector('#ePhChange').onclick = () => file.click();
+          box.querySelector('#ePhDel').onclick = () => { photo = { pid: '', data: null, changed: true }; drawPhoto(); };
+        } else if (photo.pid && !photo.changed) {
+          box.innerHTML = '<span class="hint">טוען תמונה…</span>';
+          loadPhoto(it).then(() => { photo.data = photoOf(it); if (photo.data) drawPhoto(); else { photo.pid = ''; drawPhoto(); } });
+        } else {
+          box.innerHTML = `<button type="button" class="chip new" id="ePhAdd">${ICONS.camera} הוספת תמונה של המוצר</button>`;
+          box.querySelector('#ePhAdd').onclick = () => file.click();
+        }
+      };
+      drawPhoto();
+      file.onchange = async () => {
+        const f = file.files && file.files[0]; if (!f) return;
+        box.innerHTML = '<span class="hint">מכין את התמונה…</span>';
+        try { photo = { pid: it.id + '-' + Date.now().toString(36), data: await compressImage(f), changed: true }; }
+        catch (e) { toast('לא הצלחתי לקרוא את התמונה'); }
+        file.value = ''; drawPhoto();
+      };
       root.querySelector('#eNewCat').onclick = () => { root.querySelector('#eNewCatBox').hidden = false; root.querySelector('#newCat').focus(); };
       root.querySelector('#newCatForm').onsubmit = (e) => {
         e.preventDefault();
@@ -535,6 +665,11 @@
         const note = norm(root.querySelector('#eNote').value);
         const catChanged = cat !== it.cat;
         Object.assign(it, { name: name, note: note, cat: cat });
+        if (photo.changed) {
+          it.photo = photo.data ? photo.pid : '';
+          if (photo.data) { PHOTO_CACHE[photo.pid] = photo.data; savePhotoCache(); }
+          send('setPhoto', { id: it.id, pid: it.photo, data: photo.data || '' }, photo.data ? 'התמונה נשמרה' : null);
+        }
         if (catChanged) S.data.learned = Object.assign({}, S.data.learned, { [name]: cat });
         closeSheet(); renderData();
         send('update', { id: it.id, name: name, note: note, cat: cat }, catChanged ? 'נשמר. בפעם הבאה ' + name + ' ייכנס לשם לבד' : null);
@@ -656,10 +791,31 @@
           const already = onList[norm(i.name)];
           return `<li><img src="${itemIcon(i)}" alt=""><span>${esc(i.name)}${i.note ? ` <span style="color:var(--muted);font-size:13px">· ${esc(i.note)}</span>` : ''}</span>
             <button type="button" class="again" data-t="${esc(t.id)}" data-n="${n}" ${already ? 'disabled' : ''}>${ICONS.again}${already ? 'כבר ברשימה' : 'שוב לרשימה'}</button></li>`;
-        }).join('')}</ul>` : ''}
+        }).join('')}</ul>
+        <button type="button" class="link del-trip" data-del="${esc(t.id)}" style="align-self:flex-start;color:#B23A2A;padding:6px 0">מחיקת הקנייה מההיסטוריה</button>` : ''}
       </article>`;
     }).join('');
     box.querySelectorAll('.trip-head').forEach((b) => { b.onclick = () => { S.openTrip = S.openTrip === b.dataset.trip ? '' : b.dataset.trip; renderHistoryBody(); }; });
+    box.querySelectorAll('.del-trip').forEach((b) => {
+      b.onclick = () => {
+        const t = trips.filter((x) => x.id === b.dataset.del)[0]; if (!t) return;
+        sheet(`<h2 class="hand">למחוק את הקנייה?</h2>
+          <p style="margin:0;font-size:16px;line-height:1.5">הקנייה מ${esc(dayTitle(t.date))}${t.store ? ' ב' + esc(t.store) : ''}${t.total > 0 ? ' (' + money(t.total) + ')' : ''} תימחק מההיסטוריה אצל שניכם. אי אפשר לבטל את זה.</p>
+          <div class="row">
+            <button type="button" class="btn terra hand" id="dtYes">כן, למחוק</button>
+            <button type="button" class="btn light hand" id="dtNo" style="flex:.7">ביטול</button>
+          </div>`, (root) => {
+          root.querySelector('#dtNo').onclick = closeSheet;
+          root.querySelector('#dtYes').onclick = () => {
+            closeSheet();
+            S.data.history = (S.data.history || []).filter((x) => x.id !== t.id);
+            S.openTrip = null;
+            renderHistoryBody();
+            send('deleteTrip', { id: t.id }, 'הקנייה נמחקה מההיסטוריה');
+          };
+        });
+      };
+    });
     box.querySelectorAll('.again').forEach((b) => {
       b.onclick = () => {
         const t = trips.filter((x) => x.id === b.dataset.t)[0]; const i = t && t.items[+b.dataset.n]; if (!i) return;
