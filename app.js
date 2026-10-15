@@ -77,12 +77,17 @@
   async function apiGet() {
     const url = S.cfg.api + (S.cfg.api.indexOf('?') === -1 ? '?' : '&') + 'action=state&k=' + encodeURIComponent(S.cfg.k) + '&t=' + Date.now();
     const r = await fetch(url, { cache: 'no-store' });
-    return r.json();
+    return parseRes(r);
+  }
+  async function parseRes(r) {
+    const txt = await r.text();
+    try { return JSON.parse(txt); }
+    catch (e) { throw new Error('HTTP ' + r.status + ' – ' + txt.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)); }
   }
   async function apiPost(action, payload) {
     const body = Object.assign({ k: S.cfg.k, action: action, by: S.me }, payload || {});
     const r = await fetch(S.cfg.api, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
-    return r.json();
+    return parseRes(r);
   }
   function setOnline(v) {
     if (S.online === v) return;
@@ -109,7 +114,7 @@
       } else if (res.error === 'bad_key') {
         toast('קישור ההצטרפות לא תקין. בקשו קישור חדש');
       }
-    } catch (e) { setOnline(false); }
+    } catch (e) { setOnline(false); S.lastError = String(e && e.message || e); }
   }
   async function send(action, payload, okMsg) {
     S.pending++; S.lastLocal = Date.now();
@@ -121,6 +126,7 @@
       else toast('משהו השתבש, נסו שוב');
     } catch (e) {
       S.pending--;
+      S.lastError = String(e && e.message || e);
       setOnline(false);
       toast('אין חיבור – השינוי לא נשמר');
       refresh();
@@ -555,6 +561,14 @@
       <button type="button" class="btn terra hand" id="sInvite" style="flex:none">שליחת הזמנה ל${esc(other.name)}</button>
       <button type="button" class="btn light hand" id="sCopy" style="flex:none;font-size:24px">העתקת קישור ההצטרפות</button>
       <p class="tip">${ICONS.bulb}הקישור מחבר כל טלפון לרשימה של הבית. שלחו אותו רק לבני הבית</p>
+      <details style="font-size:12px;color:var(--muted)"><summary>פרטי חיבור (לבדיקת תקלות)</summary>
+        <div dir="ltr" style="text-align:left;word-break:break-all;margin-top:6px;line-height:1.5">
+          server: …${esc(S.cfg.api.slice(-24))}<br>
+          status: ${S.online ? 'online' : 'offline'}<br>
+          error: ${esc(S.lastError || '-')}
+        </div>
+        <button type="button" class="btn-small" id="sTest" style="margin-top:8px">בדיקת חיבור עכשיו</button>
+      </details>
       <button type="button" class="link" id="sSwitch">זה לא ${esc(me.name)}? החלפת משתמש</button>`, (root) => {
       root.querySelector('#sInvite').onclick = () => {
         const text = 'היי ' + other.name + '! זה הקישור לרשימת הקניות שלנו בסופר: ' + inviteLink();
@@ -564,6 +578,7 @@
       root.querySelector('#sCopy').onclick = async () => {
         try { await navigator.clipboard.writeText(inviteLink()); toast('הקישור הועתק'); } catch (e) { toast('לא הצלחתי להעתיק'); }
       };
+      root.querySelector('#sTest').onclick = async () => { S.lastError = ''; await refresh(); closeSheet(); openSettings(); toast(S.online ? 'החיבור תקין' : 'עדיין אין חיבור'); };
       root.querySelector('#sSwitch').onclick = () => { closeSheet(); S.me = null; LS.del('me'); renderWho(); };
     });
   }
