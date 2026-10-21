@@ -3,7 +3,7 @@
   'use strict';
 
   const PEOPLE = window.PEOPLE;
-  const POLL_MS = 4000;
+  const POLL_MS = 6000;
   const LS = {
     get(k) { try { return JSON.parse(localStorage.getItem('super.' + k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem('super.' + k, JSON.stringify(v)); } catch (e) {} },
@@ -204,14 +204,26 @@
       }
     } catch (e) { setOnline(false); S.lastError = String(e && e.message || e); }
   }
+  async function postRetry(action, payload) {
+    let lastErr;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const res = await apiPost(action, payload);
+        if (res.ok || (res.error !== 'busy' && String(res.error || '').indexOf('server:') !== 0)) return res;
+        lastErr = new Error(res.error);
+      } catch (e) { lastErr = e; }
+      await new Promise((r) => setTimeout(r, 1200 * (i + 1)));
+    }
+    throw lastErr;
+  }
   async function send(action, payload, okMsg) {
     S.pending++; S.lastLocal = Date.now();
     try {
-      const res = await apiPost(action, payload);
+      const res = await postRetry(action, payload);
       setOnline(true);
       S.pending--;
       if (res.ok) { if (S.pending === 0) accept(res.state); if (okMsg) toast(okMsg); }
-      else toast('משהו השתבש, נסו שוב');
+      else { S.lastError = String(res.error); toast('משהו השתבש, נסו שוב'); }
     } catch (e) {
       S.pending--;
       S.lastError = String(e && e.message || e);
